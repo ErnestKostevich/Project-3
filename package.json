@@ -16,7 +16,8 @@
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "gen-license-keys": "tsx scripts/gen-license-keys.ts",
-    "sign-test-license": "tsx scripts/sign-test-license.ts"
+    "sign-test-license": "tsx scripts/sign-test-license.ts",
+    "test-ipn": "tsx scripts/test-ipn.ts"
   },
   "devDependencies": {
     "prettier": "^3.4.0",
