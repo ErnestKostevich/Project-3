@@ -8,6 +8,6 @@
  * `import.meta.env` values are baked at build time by WXT/Vite.
  */
 export const WEB_APP_URL =
-  (import.meta.env.WXT_API_URL as string | undefined) ?? 'https://pluck.app';
+  (import.meta.env.WXT_API_URL as string | undefined) ?? 'https://pluck-eight.vercel.app';
 
 export const LICENSE_VERIFY_URL = `${WEB_APP_URL}/api/license/verify`;

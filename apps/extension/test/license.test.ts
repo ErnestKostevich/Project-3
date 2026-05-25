@@ -7,15 +7,22 @@ import {
   type LicensePayload,
 } from '@/lib/license';
 
-describe('verifyLicense (placeholder-key mode)', () => {
-  it('refuses to verify until a real public key is committed', async () => {
+describe('verifyLicense (bundled key)', () => {
+  // After `pnpm gen-license-keys` runs, the bundled public key is real.
+  // verifyLicense (with no key override) now performs a full signature check.
+  it('rejects a syntactically valid JWT signed by an unknown key', async () => {
     const fakeJwt =
       'eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicGxhbiI6InBybyJ9.fake-signature';
     const res = await verifyLicense(fakeJwt);
     expect(res.valid).toBe(false);
-    if (!res.valid) {
-      expect(res.reason).toContain('public key has not been committed');
-    }
+    // Could fail on malformed signature decoding OR on signature mismatch —
+    // either is correct behavior. What matters is it doesn't grant Pro.
+  });
+
+  it('rejects a malformed JWT', async () => {
+    const res = await verifyLicense('not-a-jwt');
+    expect(res.valid).toBe(false);
+    if (!res.valid) expect(res.reason).toMatch(/malformed|three/i);
   });
 });
 

@@ -81,6 +81,9 @@ function SiteFooter() {
           <Link href="/faq" className="hover:text-neutral-900 dark:hover:text-neutral-100">
             FAQ
           </Link>
+          <Link href="/privacy" className="hover:text-neutral-900 dark:hover:text-neutral-100">
+            Privacy
+          </Link>
           <a
             href="https://github.com/ErnestKostevich/Project-3"
             target="_blank"
