@@ -1,0 +1,17 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  spawn-sync: false
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+
+# WXT 0.19 ships with a Vite version that's incompatible with @vitejs/plugin-react v6
+# (which @wxt-dev/module-react@1.2.x pulls in transitively). Pin to v4 until WXT 0.20 lands here.
+overrides:
+  "@vitejs/plugin-react": "^4.3.4"

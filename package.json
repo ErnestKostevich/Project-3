@@ -1,0 +1,22 @@
+{
+  "name": "pluck",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pluck — AI-powered visual web scraper. Click anything, get structured data.",
+  "packageManager": "pnpm@11.3.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:extension": "pnpm --filter @pluck/extension dev",
+    "dev:web": "pnpm --filter @pluck/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules
+.next
+.output
+.wxt
+dist
+build
+out
+pnpm-lock.yaml
