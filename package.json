@@ -1,6 +1,6 @@
 {
   "name": "pluck",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Pluck — AI-powered visual web scraper. Click anything, get structured data.",
   "packageManager": "pnpm@11.3.0",
