@@ -3,8 +3,10 @@
 import { motion, useReducedMotion } from 'motion/react';
 
 /**
- * Soft, slowly-shifting aurora gradient background. Sits in -z-10 behind
- * the hero. Uses two large blurred radial gradients animating their position.
+ * Subtle background glow. One big soft orb in the top-right that slowly
+ * drifts. Toned down from the previous three-orb aurora — competing visuals
+ * fought the hero content for attention. One orb, single accent color,
+ * heavy blur, low opacity.
  */
 export function AuroraBackground() {
   const prefersReducedMotion = useReducedMotion();
@@ -12,56 +14,26 @@ export function AuroraBackground() {
     <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
       <motion.div
         aria-hidden
-        className="absolute -left-32 -top-32 size-[600px] rounded-full opacity-60 blur-3xl"
+        className="absolute -right-40 -top-40 size-[700px] rounded-full opacity-30 blur-3xl"
         style={{
           background:
-            'radial-gradient(circle at center, rgba(99,102,241,0.55), transparent 70%)',
+            'radial-gradient(circle at center, rgba(99,102,241,0.5), transparent 65%)',
         }}
-        animate={
-          prefersReducedMotion
-            ? {}
-            : { x: [0, 40, 0], y: [0, 30, 0] }
-        }
-        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+        animate={prefersReducedMotion ? {} : { x: [0, -40, 0], y: [0, 30, 0] }}
+        transition={{ duration: 24, repeat: Infinity, ease: 'easeInOut' }}
       />
-      <motion.div
+      {/* Faint grid background — adds "developer tool" texture without competing for attention */}
+      <div
         aria-hidden
-        className="absolute right-0 top-64 size-[500px] rounded-full opacity-50 blur-3xl"
+        className="absolute inset-0 opacity-[0.04]"
         style={{
-          background:
-            'radial-gradient(circle at center, rgba(16,185,129,0.45), transparent 70%)',
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
+          backgroundSize: '64px 64px',
+          maskImage: 'radial-gradient(ellipse at top, black, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(ellipse at top, black, transparent 70%)',
         }}
-        animate={
-          prefersReducedMotion
-            ? {}
-            : { x: [0, -40, 0], y: [0, 50, 0] }
-        }
-        transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
       />
-      <motion.div
-        aria-hidden
-        className="absolute left-1/3 top-1/2 size-[400px] rounded-full opacity-40 blur-3xl"
-        style={{
-          background:
-            'radial-gradient(circle at center, rgba(168,85,247,0.4), transparent 70%)',
-        }}
-        animate={
-          prefersReducedMotion
-            ? {}
-            : { x: [0, 30, -20, 0], y: [0, -20, 30, 0] }
-        }
-        transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      {/* Subtle grain texture using SVG noise for premium feel */}
-      <svg
-        aria-hidden
-        className="absolute inset-0 size-full opacity-[0.025] mix-blend-overlay"
-      >
-        <filter id="grain">
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch" />
-        </filter>
-        <rect width="100%" height="100%" filter="url(#grain)" />
-      </svg>
     </div>
   );
 }
