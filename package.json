@@ -18,7 +18,8 @@
     "gen-license-keys": "tsx scripts/gen-license-keys.ts",
     "sign-test-license": "tsx scripts/sign-test-license.ts",
     "test-ipn": "tsx scripts/test-ipn.ts",
-    "gen-icons": "tsx scripts/gen-icons.ts"
+    "gen-icons": "tsx scripts/gen-icons.ts",
+    "gen-screenshots": "tsx scripts/gen-screenshots.ts"
   },
   "devDependencies": {
     "prettier": "^3.4.0",
