@@ -31,6 +31,7 @@ export interface SavedJob {
   /** Outbound integrations fired after a successful run. */
   integrations?: {
     webhook?: WebhookConfig;
+    sheets?: SheetsConfig;
   };
   /** Last run summary — denormalized for fast popup rendering. */
   lastRun?: {
@@ -53,6 +54,16 @@ export interface WebhookConfig {
   url: string;
   /** Auto-generated secret. The user sees it in the edit form so they can configure their server. */
   secret: string;
+}
+
+/**
+ * Google Sheets integration config. Points at the user's deployed Apps Script
+ * web-app URL (which has access to write to their sheet, running as them).
+ * No secret is stored; the URL token itself is the access credential.
+ */
+export interface SheetsConfig {
+  enabled: boolean;
+  webAppUrl: string;
 }
 
 export interface RunRecord {

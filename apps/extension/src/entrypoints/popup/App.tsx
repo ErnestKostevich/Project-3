@@ -13,6 +13,7 @@ import {
   FREE_TIER_MAX_JOBS,
   type SavedJob,
   type WebhookConfig,
+  type SheetsConfig,
 } from '@/lib/storage';
 import { verifyLicense } from '@/lib/license';
 import { downloadCsv, rowsToCsv, slugify } from '@/lib/export';
@@ -202,6 +203,11 @@ export function App() {
                           ⚡ webhook
                         </span>
                       )}
+                      {job.integrations?.sheets?.enabled && (
+                        <span className="schedule-tag" title="Sheets export configured">
+                          📊 sheets
+                        </span>
+                      )}
                     </div>
                     {job.lastRun ? (
                       <div className={`last-run ${job.lastRun.status}`}>
@@ -295,6 +301,9 @@ function JobEditForm({
   const [webhook, setWebhook] = useState<WebhookConfig>(
     job.integrations?.webhook ?? { enabled: false, url: '', secret: '' },
   );
+  const [sheets, setSheets] = useState<SheetsConfig>(
+    job.integrations?.sheets ?? { enabled: false, webAppUrl: '' },
+  );
   const [showSecret, setShowSecret] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -307,6 +316,7 @@ function JobEditForm({
   async function save() {
     setSaving(true);
     try {
+      const integrationsActive = webhook.enabled || webhook.url || sheets.enabled || sheets.webAppUrl;
       const updated: SavedJob = {
         ...job,
         name: name.trim() || job.name,
@@ -317,8 +327,11 @@ function JobEditForm({
                 nextRunAt: Date.now() + scheduleMinutes * 60_000,
               }
             : undefined,
-        integrations: webhook.enabled || webhook.url
-          ? { webhook }
+        integrations: integrationsActive
+          ? {
+              ...(webhook.enabled || webhook.url ? { webhook } : {}),
+              ...(sheets.enabled || sheets.webAppUrl ? { sheets } : {}),
+            }
           : undefined,
       };
 
@@ -418,6 +431,43 @@ function JobEditForm({
             <p className="hint">
               Your server should HMAC-SHA256 the request body using this secret and compare to the
               <code> x-pluck-signature</code> header.
+            </p>
+          </>
+        )}
+      </fieldset>
+
+      <fieldset className="field">
+        <legend>
+          Google Sheets{!isPro && <span className="pro-tag"> · Pro</span>}
+        </legend>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={sheets.enabled}
+            disabled={!isPro}
+            onChange={(e) => setSheets((s) => ({ ...s, enabled: e.target.checked }))}
+          />
+          <span>Append rows to a Google Sheet after each run</span>
+        </label>
+        {sheets.enabled && (
+          <>
+            <input
+              type="url"
+              placeholder="https://script.google.com/macros/s/.../exec"
+              value={sheets.webAppUrl}
+              onChange={(e) => setSheets((s) => ({ ...s, webAppUrl: e.target.value }))}
+              disabled={!isPro}
+            />
+            <p className="hint">
+              Deploy a tiny Apps Script first to give Pluck a URL to POST to. See{' '}
+              <a
+                href="https://github.com/ErnestKostevich/Project-3/blob/main/docs/SHEETS_SETUP.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                the 5-min setup guide
+              </a>
+              .
             </p>
           </>
         )}

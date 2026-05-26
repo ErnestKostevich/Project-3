@@ -12,6 +12,7 @@ import {
   ChromeBuiltinProvider,
   createAnthropicProvider,
   createGeminiProvider,
+  createOpenAIProvider,
   type AIProvider,
   type AISettings,
   type ProviderId,
@@ -61,12 +62,13 @@ const PROVIDERS_UI: ProviderUi[] = [
   },
   {
     id: 'openai',
-    label: 'OpenAI (coming soon)',
-    description: 'BYOK with the OpenAI API. Implementation lands after Gemini.',
+    label: 'OpenAI (BYOK)',
+    description:
+      'GPT-4o mini with your OpenAI API key. ~$0.0001 per inference, rock-solid JSON output.',
     requiresApiKey: true,
     apiKeyUrl: 'https://platform.openai.com/api-keys',
     apiKeyPlaceholder: 'sk-…',
-    buildProvider: () => null,
+    buildProvider: (s) => createOpenAIProvider(() => s),
   },
 ];
 

@@ -14,11 +14,12 @@ import type { AIProvider, AISettings, ProviderId } from './types';
 import { ChromeBuiltinProvider } from './providers/chrome-builtin';
 import { createAnthropicProvider } from './providers/anthropic';
 import { createGeminiProvider } from './providers/gemini';
+import { createOpenAIProvider } from './providers/openai';
 
 /** Fallback order when the chosen provider isn't available. */
 const PRIORITY: ProviderId[] = ['chrome-builtin', 'anthropic', 'gemini', 'openai'];
 
-function getProvider(id: ProviderId, settings: AISettings): AIProvider | null {
+function getProvider(id: ProviderId, settings: AISettings): AIProvider {
   switch (id) {
     case 'chrome-builtin':
       return ChromeBuiltinProvider;
@@ -27,8 +28,7 @@ function getProvider(id: ProviderId, settings: AISettings): AIProvider | null {
     case 'gemini':
       return createGeminiProvider(() => settings);
     case 'openai':
-      // TODO: implement when the architecture story needs a fourth provider.
-      return null;
+      return createOpenAIProvider(() => settings);
   }
 }
 
@@ -40,30 +40,30 @@ export async function runInference(req: InferRequest): Promise<{
 
   const chosen = settings.provider;
   const chosenProv = getProvider(chosen, settings);
-  if (chosenProv) {
-    const chosenAvail = await chosenProv.isAvailable();
-    if (chosenAvail.ok) {
-      return { response: await chosenProv.infer(req), providerUsed: chosen };
-    }
-
-    const failures: string[] = [`${chosen}: ${chosenAvail.reason}`];
-
-    for (const id of PRIORITY) {
-      if (id === chosen) continue;
-      const prov = getProvider(id, settings);
-      if (!prov) continue;
-      const avail = await prov.isAvailable();
-      if (avail.ok) {
-        return { response: await prov.infer(req), providerUsed: id };
-      }
-      failures.push(`${id}: ${avail.reason}`);
-    }
-
-    throw new Error(`No AI provider available. Tried:\n  - ${failures.join('\n  - ')}`);
+  const chosenAvail = await chosenProv.isAvailable();
+  if (chosenAvail.ok) {
+    return { response: await chosenProv.infer(req), providerUsed: chosen };
   }
 
-  throw new Error(`Provider "${chosen}" is not implemented yet.`);
+  const failures: string[] = [`${chosen}: ${chosenAvail.reason}`];
+
+  for (const id of PRIORITY) {
+    if (id === chosen) continue;
+    const prov = getProvider(id, settings);
+    const avail = await prov.isAvailable();
+    if (avail.ok) {
+      return { response: await prov.infer(req), providerUsed: id };
+    }
+    failures.push(`${id}: ${avail.reason}`);
+  }
+
+  throw new Error(`No AI provider available. Tried:\n  - ${failures.join('\n  - ')}`);
 }
 
-export { ChromeBuiltinProvider, createAnthropicProvider, createGeminiProvider };
+export {
+  ChromeBuiltinProvider,
+  createAnthropicProvider,
+  createGeminiProvider,
+  createOpenAIProvider,
+};
 export type { AIProvider, ProviderId, AISettings } from './types';
