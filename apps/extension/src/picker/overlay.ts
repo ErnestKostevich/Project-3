@@ -219,7 +219,12 @@ export function mountPickerOverlay(opts: PickerOptions): PickerHandle {
     } catch (err) {
       lastProposal = null;
       mode = 'picking';
+      // CRITICAL: re-render the picking view FIRST so the toolbar has a
+      // #status element to write the error into. Without this call, the
+      // toolbar was stuck on the inferring spinner forever.
+      render();
       renderError(err instanceof Error ? err.message : String(err));
+      console.error('[Pluck picker] inference failed:', err);
     }
   }
 
