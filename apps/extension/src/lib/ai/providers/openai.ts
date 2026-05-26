@@ -59,7 +59,7 @@ export function createOpenAIProvider(settings: () => AISettings): AIProvider {
         ],
         response_format: { type: 'json_object' },
         temperature: 0.2,
-        max_tokens: 2048,
+        max_tokens: 4096,
       };
 
       let res: Response;

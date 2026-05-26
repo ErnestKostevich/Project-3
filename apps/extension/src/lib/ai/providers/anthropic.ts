@@ -61,7 +61,7 @@ export function createAnthropicProvider(settings: () => AISettings): AIProvider 
 
       const body = {
         model: MODEL,
-        max_tokens: 2048,
+        max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: [
           {

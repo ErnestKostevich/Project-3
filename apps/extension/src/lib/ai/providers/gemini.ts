@@ -60,7 +60,10 @@ export function createGeminiProvider(settings: () => AISettings): AIProvider {
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.2,
-          maxOutputTokens: 2048,
+          // 4096 covers a generous schema (container + 10+ columns +
+          // sample rows). Was 2048 which silently truncated mid-JSON →
+          // JSON.parse failed → "model returned non-JSON" error.
+          maxOutputTokens: 4096,
         },
       };
 
@@ -95,7 +98,18 @@ export function createGeminiProvider(settings: () => AISettings): AIProvider {
         throw new ProviderError('gemini', `API error: ${data.error.message ?? 'unknown'}`);
       }
 
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      // Concatenate ALL parts — Gemini splits long output across multiple
+      // parts. Taking only parts[0] was clipping JSON mid-string.
+      const candidate = data.candidates?.[0];
+      if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
+        // MAX_TOKENS / SAFETY / OTHER — surface clearly instead of silently
+        // returning truncated JSON.
+        throw new ProviderError(
+          'gemini',
+          `model stopped early (finishReason=${candidate.finishReason}). Try a simpler page or fewer columns.`,
+        );
+      }
+      const text = candidate?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
       if (!text) {
         throw new ProviderError('gemini', 'response had no text content');
       }
