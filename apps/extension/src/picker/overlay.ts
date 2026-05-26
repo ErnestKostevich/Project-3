@@ -77,15 +77,36 @@ export function mountPickerOverlay(opts: PickerOptions): PickerHandle {
   function restoreOutline(el: Element) {
     const prev = prevOutlines.get(el);
     if (prev !== undefined) {
-      (el as HTMLElement).style.outline = prev;
+      const s = (el as HTMLElement).style;
+      s.setProperty('outline', prev || '', '');
+      s.removeProperty('outline-offset');
+      s.removeProperty('box-shadow');
       prevOutlines.delete(el);
     }
   }
 
-  function setOutline(el: Element, value: string) {
+  // Set both `outline` AND `box-shadow` (with !important) so the highlight is
+  // visible even on sites that aggressively override outline: none in their CSS.
+  function setOutline(el: Element, value: string, color = '#6366f1') {
     saveOutline(el);
-    (el as HTMLElement).style.outline = value;
-    (el as HTMLElement).style.outlineOffset = '-2px';
+    const s = (el as HTMLElement).style;
+    s.setProperty('outline', value, 'important');
+    s.setProperty('outline-offset', '-2px', 'important');
+    s.setProperty('box-shadow', `inset 0 0 0 2px ${color}, 0 0 0 2px ${color}`, 'important');
+  }
+
+  // Small visual flourish when a pick is added — quick pulse on the element.
+  function pulseElement(el: Element) {
+    const s = (el as HTMLElement).style;
+    const original = s.getPropertyValue('transform');
+    s.setProperty('transition', 'transform 0.18s ease-out', 'important');
+    s.setProperty('transform', `${original} scale(1.02)`, 'important');
+    setTimeout(() => {
+      s.setProperty('transform', original, '');
+      setTimeout(() => {
+        s.removeProperty('transition');
+      }, 200);
+    }, 180);
   }
 
   function isOverlayElement(el: Element | null): boolean {
@@ -117,31 +138,57 @@ export function mountPickerOverlay(opts: PickerOptions): PickerHandle {
     if (target === hovered) return;
     if (hovered && !isPicked(hovered)) restoreOutline(hovered);
     hovered = target;
-    if (target && !isPicked(target)) setOutline(target, HIGHLIGHT_OUTLINE);
+    if (target && !isPicked(target)) setOutline(target, HIGHLIGHT_OUTLINE, '#6366f1');
   }
 
+  // Capture-phase click handler. Wrapped in try/catch — silent failures here
+  // are the worst kind of bug (user clicks, nothing happens, no error).
   function onClickCapture(e: MouseEvent) {
-    if (mode !== 'picking') return;
-    const target = e.target as Element | null;
-    if (isOverlayElement(target)) return;
-    if (!target) return;
-    e.preventDefault();
-    e.stopPropagation();
+    try {
+      if (mode !== 'picking') return;
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (isOverlayElement(target)) return;
 
-    if (isPicked(target)) {
-      const idx = picks.findIndex((p) => p.element === target);
-      picks.splice(idx, 1);
-      restoreOutline(target);
-    } else {
-      setOutline(target, SELECTED_OUTLINE);
-      picks.push({
-        element: target,
-        domPath: computeDomPath(target),
-        sampleText: elementSampleText(target),
-        sampleHtml: elementSampleHtml(target),
-      });
+      e.preventDefault();
+      e.stopPropagation();
+      // stopImmediate too — some sites attach their own capture-phase
+      // listeners; without this, their handler could still fire and navigate.
+      e.stopImmediatePropagation?.();
+
+      if (isPicked(target)) {
+        const idx = picks.findIndex((p) => p.element === target);
+        picks.splice(idx, 1);
+        restoreOutline(target);
+        console.log('[Pluck picker] removed pick → now', picks.length);
+      } else {
+        setOutline(target, SELECTED_OUTLINE, '#10b981');
+        // Compute metadata in a try/catch so a single bad element doesn't
+        // silently kill the whole picker. Fall back to tag name on failure.
+        let domPath = target.tagName.toLowerCase();
+        let sampleText = '';
+        let sampleHtml = '';
+        try {
+          domPath = computeDomPath(target) || domPath;
+          sampleText = elementSampleText(target);
+          sampleHtml = elementSampleHtml(target);
+        } catch (err) {
+          console.warn('[Pluck picker] metadata extraction failed; using fallback', err);
+        }
+        picks.push({ element: target, domPath, sampleText, sampleHtml });
+        pulseElement(target);
+        console.log('[Pluck picker] added pick →', picks.length, domPath);
+      }
+      render();
+    } catch (err) {
+      console.error('[Pluck picker] click handler crashed', err);
+      // Best-effort: surface in the toolbar so the user knows something happened.
+      const statusEl = toolbar.querySelector<HTMLDivElement>('#status');
+      if (statusEl) {
+        statusEl.textContent = `Error: ${err instanceof Error ? err.message : String(err)}`;
+        statusEl.className = 'status error';
+      }
     }
-    render();
   }
 
   function onKeyDown(e: KeyboardEvent) {
@@ -231,18 +278,62 @@ export function mountPickerOverlay(opts: PickerOptions): PickerHandle {
   }
 
   function renderPicking() {
+    // Empty state: dedicate the whole toolbar to a clear "what to do" prompt.
+    if (picks.length === 0) {
+      toolbar.innerHTML = `
+        <header>
+          <span class="brand">🍒 Pluck</span>
+          <span class="hint"><kbd>Esc</kbd> to cancel</span>
+        </header>
+        <div class="empty-instr">
+          <div class="empty-step">
+            <span class="step-num">1</span>
+            <div>
+              <strong>Hover over the page</strong>
+              <p>Indigo outline follows your cursor.</p>
+            </div>
+          </div>
+          <div class="empty-step">
+            <span class="step-num">2</span>
+            <div>
+              <strong>Click 2–3 example data points</strong>
+              <p>Like one product name and one price. They'll outline green.</p>
+            </div>
+          </div>
+          <div class="empty-step">
+            <span class="step-num">3</span>
+            <div>
+              <strong>Hit "Infer pattern"</strong>
+              <p>AI figures out every other row like them.</p>
+            </div>
+          </div>
+        </div>
+        <div class="count-row">
+          <span class="count-label"><span id="pick-count">0</span> picks</span>
+          <div class="actions">
+            <button id="cancel-btn" class="ghost">Cancel</button>
+            <button id="infer-btn" class="primary" disabled>Infer pattern</button>
+          </div>
+        </div>
+        <div id="status"></div>
+      `;
+      bindPickingHandlers();
+      return;
+    }
+
+    // Compact "in progress" state once the user has picked something.
     toolbar.innerHTML = `
       <header>
         <span class="brand">🍒 Pluck</span>
-        <span class="hint">Click example data · <kbd>Esc</kbd> to cancel</span>
+        <span class="hint"><strong style="color: #10b981;">${picks.length} pick${
+          picks.length === 1 ? '' : 's'
+        }</strong> · <kbd>Esc</kbd> to cancel</span>
       </header>
       <div class="count-row">
-        <span><span id="pick-count">${picks.length}</span> picks</span>
+        <span class="count-label">Click more, or hit Infer ↓</span>
         <div class="actions">
           <button id="cancel-btn" class="ghost">Cancel</button>
-          <button id="infer-btn" class="primary" ${picks.length === 0 ? 'disabled' : ''}>
-            Infer pattern
-          </button>
+          <button id="infer-btn" class="primary">Infer pattern</button>
         </div>
       </div>
       <div id="pick-list">
@@ -253,7 +344,7 @@ export function mountPickerOverlay(opts: PickerOptions): PickerHandle {
               <input data-i="${i}" class="label-input" placeholder="column_${i + 1}"
                      value="${escapeAttr(p.label ?? '')}" />
               <span class="pick-text" title="${escapeAttr(p.sampleText)}">${escapeHtml(
-                p.sampleText.slice(0, 40),
+                p.sampleText.slice(0, 40) || '(no text)',
               )}</span>
               <button data-i="${i}" class="remove-btn" aria-label="Remove">✕</button>
             </div>`,
@@ -575,6 +666,29 @@ const STYLE = /* css */ `
   .empty-result {
     padding: 12px; text-align: center; color: var(--fg-subtle); font-size: 12px;
     background: var(--bg-elev); border-radius: 6px;
+  }
+  .empty-instr {
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 6px 0 12px;
+  }
+  .empty-step {
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .empty-step .step-num {
+    flex-shrink: 0;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font-weight: 700; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .empty-step strong { display: block; color: var(--fg); font-size: 13px; }
+  .empty-step p {
+    margin: 2px 0 0; color: var(--fg-muted); font-size: 12px; line-height: 1.4;
+  }
+  .count-label {
+    color: var(--fg-muted); font-size: 12px;
   }
   .save-form { display: flex; flex-direction: column; gap: 10px; }
   .save-form label {
