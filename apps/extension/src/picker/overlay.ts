@@ -24,6 +24,7 @@
 import type { ElementPick, InferResponse } from '@pluck/shared';
 import { computeDomPath, elementSampleHtml, elementSampleText } from '@/lib/dom-path';
 import { extractWithSchema } from '@/lib/selector-validation';
+import { detectPatterns } from '@/lib/auto-detect';
 
 export interface PickerOptions {
   onInfer: (picks: ElementPick[]) => Promise<InferResponse>;
@@ -284,13 +285,40 @@ export function mountPickerOverlay(opts: PickerOptions): PickerHandle {
   }
 
   function renderPicking() {
-    // Empty state: dedicate the whole toolbar to a clear "what to do" prompt.
+    // Empty state: dedicate the whole toolbar to a clear "what to do" prompt,
+    // plus a one-click "Auto-detect" shortcut for pages with obvious repeating
+    // structures (lists, tables, grids of cards).
     if (picks.length === 0) {
+      let detected: ReturnType<typeof detectPatterns> = [];
+      try {
+        detected = detectPatterns();
+      } catch (err) {
+        console.warn('[Pluck picker] auto-detect failed', err);
+      }
+      const autoHtml = detected.length
+        ? `<div class="auto-detect">
+            <div class="auto-detect-label">✨ Auto-detected on this page</div>
+            ${detected
+              .slice(0, 3)
+              .map(
+                (p, i) => `
+                <button class="auto-btn" data-i="${i}">
+                  <span class="auto-count">${p.items.length}</span>
+                  <span class="auto-desc">${escapeHtml(p.description)}</span>
+                  <span class="auto-go">Use →</span>
+                </button>`,
+              )
+              .join('')}
+            <div class="auto-or">— or pick manually —</div>
+          </div>`
+        : '';
+
       toolbar.innerHTML = `
         <header>
           <span class="brand">🍒 Pluck</span>
           <span class="hint"><kbd>Esc</kbd> to cancel</span>
         </header>
+        ${autoHtml}
         <div class="empty-instr">
           <div class="empty-step">
             <span class="step-num">1</span>
@@ -324,6 +352,7 @@ export function mountPickerOverlay(opts: PickerOptions): PickerHandle {
         <div id="status"></div>
       `;
       bindPickingHandlers();
+      bindAutoDetectHandlers(detected);
       return;
     }
 
@@ -470,6 +499,55 @@ export function mountPickerOverlay(opts: PickerOptions): PickerHandle {
   }
 
   // ── Handler bindings ────────────────────────────────────────────────────
+
+  function bindAutoDetectHandlers(detected: ReturnType<typeof detectPatterns>) {
+    toolbar.querySelectorAll<HTMLButtonElement>('.auto-btn').forEach((btn) => {
+      btn.onclick = () => {
+        const i = Number(btn.dataset.i);
+        const pattern = detected[i];
+        if (!pattern) return;
+        const firstItem = pattern.items[0];
+        if (!firstItem) return;
+        try {
+          // Pick the first item of the detected pattern as a single example.
+          // The user can hit Infer immediately, or click INSIDE this item to
+          // add column-level picks for refinement.
+          setOutline(firstItem, SELECTED_OUTLINE, '#10b981');
+          let domPath = firstItem.tagName.toLowerCase();
+          let sampleText = '';
+          let sampleHtml = '';
+          try {
+            domPath = computeDomPath(firstItem) || domPath;
+            sampleText = elementSampleText(firstItem);
+            sampleHtml = elementSampleHtml(firstItem);
+          } catch (err) {
+            console.warn('[Pluck picker] auto-pick metadata failed', err);
+          }
+          picks.push({
+            element: firstItem,
+            domPath,
+            sampleText,
+            sampleHtml,
+            label: 'row',
+          });
+          // Briefly flash the other matched items so the user sees what was
+          // auto-found, then restore the styling.
+          for (const item of pattern.items.slice(1, 12)) {
+            setOutline(item, MATCHED_OUTLINE, '#10b981');
+          }
+          setTimeout(() => {
+            for (const item of pattern.items.slice(1, 12)) {
+              if (!isPicked(item)) restoreOutline(item);
+            }
+          }, 1500);
+          console.log('[Pluck picker] auto-detect picked', pattern.description);
+          render();
+        } catch (err) {
+          console.error('[Pluck picker] auto-detect pick failed', err);
+        }
+      };
+    });
+  }
 
   function bindPickingHandlers() {
     toolbar.querySelector<HTMLButtonElement>('#cancel-btn')!.onclick = () => {
@@ -695,6 +773,65 @@ const STYLE = /* css */ `
   }
   .count-label {
     color: var(--fg-muted); font-size: 12px;
+  }
+  .auto-detect {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, rgba(99,102,241,0.10), rgba(16,185,129,0.08));
+    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: 8px;
+  }
+  .auto-detect-label {
+    font-size: 11px; font-weight: 600;
+    color: var(--fg);
+    letter-spacing: 0.02em;
+  }
+  .auto-btn {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 100ms, transform 100ms;
+    font: inherit;
+    color: inherit;
+  }
+  .auto-btn:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .auto-count {
+    background: var(--accent);
+    color: white;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 99px;
+  }
+  .auto-desc {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--fg-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .auto-go {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .auto-or {
+    font-size: 10px;
+    color: var(--fg-subtle);
+    text-align: center;
+    padding-top: 4px;
   }
   .save-form { display: flex; flex-direction: column; gap: 10px; }
   .save-form label {
